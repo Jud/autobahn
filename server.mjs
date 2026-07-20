@@ -14,6 +14,7 @@
 //     "port": 4780
 //   }
 import { createServer } from 'node:http'
+import { watch } from 'node:fs'
 import { readFile, writeFile, readdir } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import path from 'node:path'
@@ -29,6 +30,25 @@ try {
 const BACKLOG = path.join(ROOT, config.backlog)
 const LANES = config.lanes
 const PORT = config.port
+
+// Keep browser clients in sync when the backlog changes outside Autobahn. Watch
+// the containing directory (rather than the file itself) so atomic save/rename
+// patterns used by editors do not detach the watcher from the replacement file.
+const updateClients = new Set()
+let broadcastTimer = null
+const backlogDirectory = path.dirname(BACKLOG)
+const backlogName = path.basename(BACKLOG)
+const backlogWatcher = watch(backlogDirectory, (_event, filename) => {
+  if (filename && String(filename) !== backlogName) return
+  clearTimeout(broadcastTimer)
+  broadcastTimer = setTimeout(() => {
+    const message = `event: backlog\ndata: ${JSON.stringify({ changed: true })}\n\n`
+    updateClients.forEach((client) => client.write(message))
+  }, 50)
+})
+backlogWatcher.on('error', (error) => {
+  console.error(`Autobahn could not watch ${backlogDirectory}: ${error.message}`)
+})
 
 // Docs shown as read-only tabs: config list, or every .md in the directory.
 async function listDocs() {
@@ -151,6 +171,17 @@ createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${PORT}`)
     if (url.pathname === '/') {
       return send(res, 200, await readFile(new URL('./index.html', import.meta.url), 'utf8'), 'text/html')
+    }
+    if (url.pathname === '/api/events') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      })
+      res.write(': connected\n\n')
+      updateClients.add(res)
+      req.on('close', () => updateClients.delete(res))
+      return
     }
     if (url.pathname === '/api/board') {
       const md = await readFile(BACKLOG, 'utf8')

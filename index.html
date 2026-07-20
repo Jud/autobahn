@@ -106,10 +106,15 @@
   </div>
 </div>
 <script>
-let state = null, tab = 'Board', LANES = []
+let state = null, tab = 'Board', LANES = [], loadVersion = 0
 
 async function load() {
-  state = await (await fetch('/api/board')).json()
+  const version = ++loadVersion
+  const nextState = await (await fetch('/api/board')).json()
+  if (version !== loadVersion) return
+  const openCardId = document.getElementById('lb').classList.contains('open')
+    ? document.getElementById('lb-id').textContent : null
+  state = nextState
   LANES = [...state.lanes, 'Shipped']
   document.getElementById('root').textContent = state.root
   document.getElementById('hint').textContent =
@@ -118,6 +123,8 @@ async function load() {
     'New card mints the next number. Click a card for full detail. Commit as usual.'
   renderTabs()
   render()
+  if (openCardId && state.items.some(i => i.id === openCardId)) openCard(openCardId)
+  else if (openCardId) closeCard()
 }
 
 function renderTabs() {
@@ -300,6 +307,11 @@ function wireDnd() {
     })
   })
 }
+
+// The server watches the backlog's directory and emits an event for external
+// writes, including editors that save atomically by replacing the file.
+const updates = new EventSource('/api/events')
+updates.addEventListener('backlog', () => load())
 load()
 </script>
 </body>

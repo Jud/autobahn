@@ -48,6 +48,8 @@ Requires Node 18+. No install step, no dependencies.
   automatically. No archiving ritual.
 - **New card** — mints the next id (`TASK-007`) and appends a template card.
 - **Card lightbox** — click any card for its full rendered body.
+- **Live external updates** — edits from another editor refresh the board and any
+  open card automatically.
 - **Pinned notes** — non-card `##` blocks inside the first lane render as
   pinned notes above the board (sprint goals, standing reminders).
 - **Docs tabs** — the rest of your project's markdown, rendered read-only.
