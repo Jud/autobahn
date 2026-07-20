@@ -112,8 +112,8 @@ async function load() {
   const version = ++loadVersion
   const nextState = await (await fetch('/api/board')).json()
   if (version !== loadVersion) return
-  const openCardId = document.getElementById('lb').classList.contains('open')
-    ? document.getElementById('lb-id').textContent : null
+  const openCardId = document.getElementById('lb').classList.contains('open') &&
+    document.getElementById('lb-id').textContent
   state = nextState
   LANES = [...state.lanes, 'Shipped']
   document.getElementById('root').textContent = state.root
@@ -123,8 +123,7 @@ async function load() {
     'New card mints the next number. Click a card for full detail. Commit as usual.'
   renderTabs()
   render()
-  if (openCardId && state.items.some(i => i.id === openCardId)) openCard(openCardId)
-  else if (openCardId) closeCard()
+  if (openCardId) openCard(openCardId)
 }
 
 function renderTabs() {
@@ -262,7 +261,7 @@ let dragged = false
 function openCard(id) {
   if (dragged) { dragged = false; return }
   const item = state.items.find(i => i.id === id)
-  if (!item) return
+  if (!item) return closeCard()
   document.getElementById('lb-id').textContent = item.id
   document.getElementById('lb-title').innerHTML = inline(deshout(item.title))
   document.getElementById('lb-lane').textContent = (item.done ? 'Shipped · filed in ' : '') + item.lane
@@ -308,10 +307,7 @@ function wireDnd() {
   })
 }
 
-// The server watches the backlog's directory and emits an event for external
-// writes, including editors that save atomically by replacing the file.
-const updates = new EventSource('/api/events')
-updates.addEventListener('backlog', () => load())
+new EventSource('/api/events').onmessage = load
 load()
 </script>
 </body>
